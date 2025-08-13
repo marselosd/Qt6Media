@@ -1,0 +1,12 @@
+# Ignore build folders
+cmake-build-debug/
+cmake-build-release/
+build/
+
+# Ignore compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
