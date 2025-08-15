@@ -37,7 +37,12 @@ private slots:
     void on_soundSlider_sliderMoved(int position);
     void on_searchButton_clicked();
     void updateSongInfo();
+    void updatePlayIcon(QMediaPlayer::PlaybackState state);
+    QString formatTime(qint64);
+    void updateProgress(qint64 position);
     void on_listWidget_itemDoubleClicked(QListWidgetItem *item);
+    void playIndex(int index);
+    void on_muteButton_clicked();
 
 private:
     Ui::player *ui;
@@ -46,6 +51,8 @@ private:
     QStringList playlist;
     int currentSongIndex {-1};
     QStack<int> queue;
+    qint64 music_duration {0};
+    bool music_isPressed {false};
 };
 
 

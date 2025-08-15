@@ -14,11 +14,17 @@ find_package(Qt6 COMPONENTS
         Multimedia
         REQUIRED)
 
-add_executable(Qt6Media main.cpp
+add_executable(Qt6Media
         main.cpp
         Forms/player.cpp
         Forms/player.h
-        Forms/player.ui)
+        Forms/player.ui
+        Forms/clickableslider.h)
+
+target_include_directories(Qt6Media PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Forms
+)
+
 target_link_libraries(Qt6Media
         Qt::Core
         Qt::Gui

@@ -5,31 +5,44 @@
 #include "player.h"
 
 #include <iostream>
-#include <stdlib.h>
-#include <time.h>
-#include <stdio.h>
+#include <random>
 
 #include "ui_player.h"
 
 player::player(QWidget *parent) : QWidget(parent), ui(new Ui::player) {
     ui->setupUi(this);
+    setFixedSize(800, 600);
+    setWindowTitle("Qt6 Media Player");
+
     mediaPlayer = new QMediaPlayer(this);
     audioOutput = new QAudioOutput(this);
+    audioOutput->setVolume(0.5f);
+    ui->soundSlider->setValue(50);
     mediaPlayer->setAudioOutput(audioOutput);
-    srand(time(NULL));
-
-    connect(ui->stopPauseButton, &QPushButton::click, this, &player::on_stopPauseButton_clicked);
-    connect(ui->nextButton, &QPushButton::clicked, this, &player::on_nextButton_clicked);
-    connect(ui->lastButton, &QPushButton::clicked, this, &player::on_lastButton_clicked);
 
     connect(ui->soundSlider, &QSlider::sliderMoved, this, &player::on_soundSlider_sliderMoved);
-
-    connect(mediaPlayer, &QMediaPlayer::durationChanged, ui->progressBar, &QProgressBar::setMaximum);
-    connect(mediaPlayer, &QMediaPlayer::positionChanged, ui->progressBar, &QProgressBar::setValue);
-
-    connect(ui->searchButton, &QPushButton::click, this, &player::on_searchButton_clicked);
-    connect(ui->listWidget, &QListWidget::itemDoubleClicked, this, &player::on_listWidget_itemDoubleClicked);
     connect(mediaPlayer, &QMediaPlayer::mediaStatusChanged, this, &player::updateSongInfo);
+    connect(mediaPlayer, &QMediaPlayer::playbackStateChanged, this, &player::updatePlayIcon);
+
+    connect(mediaPlayer, &QMediaPlayer::durationChanged, this, [this](qint64 duration) {
+        music_duration = duration;
+        ui->progressSlider->setRange(0,duration);
+    });
+
+    connect(ui->progressSlider, &QSlider::sliderPressed, this, [this]() {
+        music_isPressed = true;
+    });
+
+    connect(ui->progressSlider, &QSlider::sliderMoved, this, [this](int value) {
+        mediaPlayer->setPosition(value);
+    });
+
+    connect(ui->progressSlider, &QSlider::sliderReleased, this, [this]() {
+        music_isPressed = false;
+        mediaPlayer->setPosition(ui->progressSlider->value());
+    });
+
+    connect(mediaPlayer, &QMediaPlayer::positionChanged, this, &player::updateProgress);
 }
 
 player::~player() {
@@ -43,19 +56,47 @@ void player::on_stopPauseButton_clicked() {
     else {
         mediaPlayer->play();
     }
-
 }
 
 void player::on_nextButton_clicked() {
-    mediaPlayer->play();
+    if (playlist.isEmpty())
+        return;
+
+    std::random_device rd {};
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, playlist.size() - 1);
+
+    int index {};
+    do {
+        index = dis(gen);
+    }while (index == currentSongIndex);
+
+    playIndex(index);
 }
 
 void player::on_lastButton_clicked() {
+    if (queue.isEmpty() || (queue.top() < 0 || queue.top() > playlist.size()))
+        return;
 
+    queue.pop();
+    if (!queue.isEmpty()) {
+        mediaPlayer->setSource(QUrl::fromLocalFile(playlist.at(queue.top())));
+        mediaPlayer->play();
+    }
 }
 
 void player::on_soundSlider_sliderMoved(int position) {
+    audioOutput->setVolume(position/100.0f);
+}
 
+void player::on_muteButton_clicked() {
+    if (audioOutput->isMuted()) {
+        audioOutput->setMuted(false);
+        ui->muteButton->setIcon(QIcon::fromTheme("audio-volume-high"));
+    } else {
+        audioOutput->setMuted(true);
+        ui->muteButton->setIcon(QIcon::fromTheme("audio-volume-muted"));
+    }
 }
 
 void player::on_searchButton_clicked() {
@@ -64,12 +105,14 @@ void player::on_searchButton_clicked() {
     if (!folderPath.isEmpty()) {
         ui->listWidget->clear();
         playlist.clear();
+        queue.clear();
+        currentSongIndex = -1;
 
         QDir dir(folderPath);
         QStringList musics {dir.entryList(QStringList() << "*.mp3", QDir::Files)};
 
 
-        foreach (QString musicName, musics) {
+        for (const QString &musicName : musics) {
             QString filePath {dir.absoluteFilePath(musicName)};
             playlist << filePath;
             ui->listWidget->addItem(musicName);
@@ -81,8 +124,6 @@ void player::updateSongInfo() {
     if (mediaPlayer->mediaStatus() == QMediaPlayer::LoadedMedia) {
         QMediaMetaData meta {mediaPlayer->metaData()};
         QString song {meta.value(QMediaMetaData::Title).toString()};
-        QString artist {meta.value(QMediaMetaData::AlbumArtist).toString()};
-        QString album {meta.value(QMediaMetaData::AlbumTitle).toString()};
         QImage img {meta.value(QMediaMetaData::ThumbnailImage).value<QImage>()};
 
         if (song.isEmpty()) {
@@ -91,26 +132,56 @@ void player::updateSongInfo() {
         }
 
         if (!img.isNull()) {
-            ui->coverLabel->setPixmap(QPixmap::fromImage(img).scaled(ui->coverLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            ui->coverLabel->setPixmap(QPixmap::fromImage(img).scaled(ui->verticalLayoutWidget->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         } else {
             ui->coverLabel->clear();
         }
 
         ui->dataPlainText->clear();
-        ui->dataPlainText->appendPlainText("Now Playing 🎶.. "+ song);
-        ui->dataPlainText->appendPlainText("By 🎶.. " + artist);
-        ui->dataPlainText->appendPlainText("Album 🎶.." + album);
+        ui->dataPlainText->appendPlainText(song);
     }
 }
+
+void player::updatePlayIcon(QMediaPlayer::PlaybackState state) {
+    if (state == QMediaPlayer::PlayingState) {
+        ui->stopPauseButton->setIcon(QIcon::fromTheme("media-playback-pause"));
+    } else {
+        ui->stopPauseButton->setIcon(QIcon::fromTheme("media-playback-start"));
+    }
+}
+
+void player::updateProgress(qint64 position) {
+    if (!music_isPressed)
+        ui->progressSlider->setValue(position);
+
+    QString text = QString("%1 / %2").arg(formatTime(position), formatTime(music_duration));
+    ui->timeLabel->setText(text);
+}
+
+
 
 void player::on_listWidget_itemDoubleClicked(QListWidgetItem *item) {
     int index {ui->listWidget->row(item)};
 
     if (index >= 0 && index < playlist.size()) {
-        mediaPlayer->setSource(QUrl::fromLocalFile(playlist.at(index)));
-        mediaPlayer->play();
-        currentSongIndex = index;
+        playIndex(index);
     }
 }
 
+void player::playIndex(int index) {
+    if (index < 0 || index >= playlist.size())
+        return;
+
+    currentSongIndex = index;
+    queue.push(currentSongIndex);
+    mediaPlayer->setSource(QUrl::fromLocalFile(playlist.at(currentSongIndex)));
+    mediaPlayer->play();
+}
+
+QString player::formatTime(qint64 milsec) {
+    qint64 seconds = milsec / 1000;
+    const qint64 minutes = seconds / 60;
+    seconds -= minutes * 60;
+    return QStringLiteral("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+}
 
