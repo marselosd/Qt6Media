@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0)
+cmake_minimum_required(VERSION 3.22)
 project(Qt6Media)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -19,10 +19,13 @@ add_executable(Qt6Media
         Forms/player.cpp
         Forms/player.h
         Forms/player.ui
-        Forms/clickableslider.h)
+        Forms/clickableslider.h
+        Forms/Icons.h
+        resources.qrc)
 
 target_include_directories(Qt6Media PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/Forms
+        ${CMAKE_CURRENT_SOURCE_DIR}/icons
 )
 
 target_link_libraries(Qt6Media
@@ -53,6 +56,14 @@ if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
                 "${QT_INSTALL_PATH}/plugins/platforms/qwindows${DEBUG_SUFFIX}.dll"
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/platforms/")
     endif ()
+    set(QT_PLUGIN_SUBDIRS imageformats multimedia platforms)
+    foreach(subdir ${QT_PLUGIN_SUBDIRS})
+        add_custom_command(TARGET Qt6Media POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${QT_INSTALL_PATH}/plugins/${subdir}"
+                "$<TARGET_FILE_DIR:Qt6Media>/${subdir}"
+        )
+    endforeach()
     foreach (QT_LIB Core Gui Widgets)
         add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy
