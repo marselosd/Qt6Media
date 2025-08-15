@@ -7,6 +7,7 @@
 #include <iostream>
 #include <random>
 
+#include "Icons.h"
 #include "ui_player.h"
 
 player::player(QWidget *parent) : QWidget(parent), ui(new Ui::player) {
@@ -92,10 +93,10 @@ void player::on_soundSlider_sliderMoved(int position) {
 void player::on_muteButton_clicked() {
     if (audioOutput->isMuted()) {
         audioOutput->setMuted(false);
-        ui->muteButton->setIcon(QIcon::fromTheme("audio-volume-high"));
+        ui->muteButton->setIcon(Icons::getIcon(AppIcon::HIGH));
     } else {
         audioOutput->setMuted(true);
-        ui->muteButton->setIcon(QIcon::fromTheme("audio-volume-muted"));
+        ui->muteButton->setIcon(Icons::getIcon(AppIcon::MUTED));
     }
 }
 
@@ -131,22 +132,22 @@ void player::updateSongInfo() {
             song = info.baseName();
         }
 
-        if (!img.isNull()) {
+        if (!img.isNull() && !img.size().isEmpty()) {
             ui->coverLabel->setPixmap(QPixmap::fromImage(img).scaled(ui->verticalLayoutWidget->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         } else {
-            ui->coverLabel->clear();
+            ui->coverLabel->setPixmap(notfoundCover.scaled(ui->coverLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
         }
 
-        ui->dataPlainText->clear();
-        ui->dataPlainText->appendPlainText(song);
+        ui->songLabel->clear();
+        ui->songLabel->setText(song);
     }
 }
 
 void player::updatePlayIcon(QMediaPlayer::PlaybackState state) {
     if (state == QMediaPlayer::PlayingState) {
-        ui->stopPauseButton->setIcon(QIcon::fromTheme("media-playback-pause"));
+        ui->stopPauseButton->setIcon(Icons::getIcon(AppIcon::PAUSE));
     } else {
-        ui->stopPauseButton->setIcon(QIcon::fromTheme("media-playback-start"));
+        ui->stopPauseButton->setIcon(Icons::getIcon(AppIcon::PLAY));
     }
 }
 

@@ -53,6 +53,7 @@ private:
     QStack<int> queue;
     qint64 music_duration {0};
     bool music_isPressed {false};
+    const QPixmap notfoundCover{":/icons/cover_notfound.jpg"};
 };
 
 
